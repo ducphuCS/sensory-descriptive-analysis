@@ -1,23 +1,46 @@
-import pandas as pd
-import numpy as np
+import os
+import subprocess
+import time
+from dotenv import load_dotenv
 
-def gmean_standard(x):
-    v = x.dropna()
-    if len(v) == 0 or (v < 0).any(): 
-        return np.nan
-    return 0.0 if (v == 0).any() else np.exp(np.log(v).mean())
+# Load environment variables
+load_dotenv()
+
+# Service Configuration
+BACKEND_HOST = os.getenv("BACKEND_HOST", "127.0.0.1")
+BACKEND_PORT = os.getenv("BACKEND_PORT", "8000")
+FRONTEND_HOST = os.getenv("FRONTEND_HOST", "127.0.0.1")
+FRONTEND_PORT = os.getenv("FRONTEND_PORT", "8501")
 
 def main():
-    df = pd.read_csv('data.csv').dropna(how='all')
+    print(f"Starting FastAPI Backend (port {BACKEND_PORT})...")
+    backend_process = subprocess.Popen(
+        ["uv", "run", "uvicorn", "backend.app:app", "--host", BACKEND_HOST, "--port", BACKEND_PORT]
+    )
     
-    metadata = ['subject_id', 'object_code', 'object_name', 'replicate', 'Comment']
-    attrs = [col for col in df.columns if col not in metadata]
+    # Wait a short moment for backend to initialize
+    time.sleep(2)
     
-    df[attrs] = df[attrs].apply(pd.to_numeric, errors='coerce')
-    df['object_code'] = df['object_code'].astype(int)
+    print(f"Starting Streamlit Frontend (port {FRONTEND_PORT})...")
+    frontend_process = subprocess.Popen(
+        [
+            "uv", "run", "streamlit", "run", "frontend/app.py", 
+            "--server.port", FRONTEND_PORT, 
+            "--server.address", FRONTEND_HOST
+        ]
+    )
     
-    result = df.groupby(['object_code', 'object_name'])[attrs].agg(gmean_standard).reset_index()
-    result.to_csv('product_gmeans_standard.csv', index=False)
+    try:
+        # Keep the launcher script active
+        while True:
+            time.sleep(1)
+    except KeyboardInterrupt:
+        print("\nShutting down dashboard processes...")
+        backend_process.terminate()
+        frontend_process.terminate()
+        backend_process.wait()
+        frontend_process.wait()
+        print("Dashboard shutdown complete.")
 
 if __name__ == '__main__':
     main()
