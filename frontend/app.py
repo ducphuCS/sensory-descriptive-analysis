@@ -48,10 +48,23 @@ def fetch_pca():
         pass
     return None
 
+def fetch_correlation():
+    try:
+        response = requests.get(f"{API_URL}/correlation")
+        if response.status_code == 200:
+            return response.json()
+    except Exception:
+        pass
+    return None
+
 st.title("Descriptive Sensory Analysis Dashboard")
 
 # Create tabs
-tab1, tab2 = st.tabs(["📊 Geometric Means (Dravnieks Score)", "📈 PCA Analysis (Arithmetic Means)"])
+tab1, tab2, tab3 = st.tabs([
+    "📊 Geometric Means (Dravnieks Score)", 
+    "📈 PCA Analysis (Arithmetic Means)",
+    "🔗 Attribute Correlation"
+])
 
 with tab1:
     st.write("This tab ranks sensory attributes by their Dravnieks modified frequency geometric mean index.")
@@ -194,3 +207,77 @@ with tab2:
             st.plotly_chart(fig_attr, use_container_width=True)
     else:
         st.info("Loading PCA mapping data from backend...")
+
+with tab3:
+    st.write("This tab shows the correlation between different sensory attributes based on product-level arithmetic means.")
+    
+    corr_data = fetch_correlation()
+    if corr_data:
+        attrs = corr_data["attributes"]
+        matrix = corr_data["matrix"]
+        
+        df_corr = pd.DataFrame(matrix, index=attrs, columns=attrs)
+        
+        st.subheader("Correlation Heatmap")
+        
+        fig_heat = px.imshow(
+            df_corr,
+            x=attrs,
+            y=attrs,
+            color_continuous_scale="RdBu_r",
+            zmin=-1.0,
+            zmax=1.0,
+            labels=dict(color="Correlation (r)"),
+            title="Pearson Correlation Matrix of Sensory Attributes"
+        )
+        fig_heat.update_layout(
+            height=700,
+            margin=dict(l=40, r=40, t=40, b=40)
+        )
+        st.plotly_chart(fig_heat, use_container_width=True)
+        
+        st.markdown("---")
+        st.subheader("Explore Single Attribute Correlation")
+        
+        selected_attr = st.selectbox(
+            "Select an attribute to inspect:",
+            options=attrs,
+            key="corr_inspect_select"
+        )
+        
+        if selected_attr:
+            # Get correlations for this attribute
+            corr_series = df_corr[selected_attr].drop(selected_attr).sort_values(ascending=False)
+            df_single_corr = pd.DataFrame({
+                "attribute": corr_series.index,
+                "correlation": corr_series.values
+            })
+            
+            col_chart, col_data = st.columns([3, 1])
+            
+            with col_chart:
+                fig_single = px.bar(
+                    df_single_corr,
+                    x="correlation",
+                    y="attribute",
+                    orientation="h",
+                    category_orders={"attribute": list(df_single_corr["attribute"])[::-1]},
+                    color="correlation",
+                    color_continuous_scale="RdBu_r",
+                    range_color=[-1, 1],
+                    labels={"correlation": "Pearson Correlation (r)", "attribute": "Sensory Attribute"},
+                    title=f"Correlation of other attributes with '{selected_attr}'"
+                )
+                fig_single.update_layout(
+                    height=600,
+                    margin=dict(l=20, r=20, t=40, b=20)
+                )
+                st.plotly_chart(fig_single, use_container_width=True)
+                
+            with col_data:
+                st.write("**Correlation Coefficients**")
+                df_display_single = df_single_corr.copy()
+                df_display_single["correlation"] = df_display_single["correlation"].round(4)
+                st.dataframe(df_display_single, use_container_width=True, height=550, hide_index=True)
+    else:
+        st.info("Loading correlation data from backend...")

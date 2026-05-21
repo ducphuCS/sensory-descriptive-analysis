@@ -20,6 +20,14 @@ uv run python -m backend.arithmetic_mean
 
 This generates the arithmetic means and saves them to `data/product_ameans.csv`.
 
+To calculate the correlation matrix of attributes across all products, run:
+
+```bash
+uv run python -m backend.correlation
+```
+
+This generates the Pearson correlation matrix and saves it to `data/attribute_correlation.csv`.
+
 ## Project Structure
 
 The project follows a standard structured layout for web applications combining FastAPI and Streamlit:
@@ -30,11 +38,13 @@ descriptive-sensory/
 │   ├── data.csv                      # Raw input sensory ratings
 │   ├── product_gmeans_standard.csv   # Pre-calculated product scores
 │   ├── overall_gmeans_standard.csv   # Pre-calculated overall scores
-│   └── product_ameans.csv            # Pre-calculated product arithmetic means
+│   ├── product_ameans.csv            # Pre-calculated product arithmetic means
+│   └── attribute_correlation.csv     # Pre-calculated attribute correlation matrix
 ├── backend/
 │   ├── app.py                        # FastAPI backend server
 │   ├── geometric_mean.py             # Geometric mean (Dravnieks Score) logic
-│   └── arithmetic_mean.py            # Arithmetic mean calculation logic
+│   ├── arithmetic_mean.py            # Arithmetic mean calculation logic
+│   └── correlation.py                # Standalone correlation calculation logic
 ├── frontend/
 │   └── app.py                        # Streamlit frontend dashboard
 ├── main.py                           # App runner (launches both services)

@@ -13,6 +13,7 @@ app = FastAPI(title="Sensory Geometric Means API")
 GMEANS_CSV_PATH = os.getenv("PRODUCT_GMEANS_PATH", "data/product_gmeans_standard.csv")
 OVERALL_CSV_PATH = os.getenv("OVERALL_GMEANS_PATH", "data/overall_gmeans_standard.csv")
 AMEANS_CSV_PATH = os.getenv("PRODUCT_AMEANS_PATH", "data/product_ameans.csv")
+CORRELATION_CSV_PATH = os.getenv("ATTRIBUTE_CORRELATION_PATH", "data/attribute_correlation.csv")
 
 def get_precalculated_gmeans():
     if not os.path.exists(GMEANS_CSV_PATH):
@@ -107,4 +108,22 @@ def get_pca():
         "products": products_pca,
         "attributes": attributes_pca,
         "explained_variance": explained_variance
+    }
+
+@app.get("/api/correlation")
+def get_correlation():
+    if not os.path.exists(CORRELATION_CSV_PATH):
+        raise HTTPException(
+            status_code=500,
+            detail=f"Precalculated correlation file '{CORRELATION_CSV_PATH}' not found. Please run 'backend/correlation.py' first."
+        )
+    
+    # Load correlation CSV (keep index_col=0 to identify row names)
+    corr_df = pd.read_csv(CORRELATION_CSV_PATH, index_col=0)
+    attrs = corr_df.index.tolist()
+    matrix = corr_df.values.tolist()
+    
+    return {
+        "attributes": attrs,
+        "matrix": matrix
     }
