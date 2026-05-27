@@ -205,6 +205,11 @@ with tab2:
             fig_attr.add_vline(x=0, line_width=1, line_color="#d1d8e0", line_dash="dash")
             
             st.plotly_chart(fig_attr, use_container_width=True)
+            try:
+                os.makedirs("images", exist_ok=True)
+                fig_attr.write_html("images/pca_attribute_map.html")
+            except Exception as e:
+                print(f"Warning: Could not save loadings chart HTML: {e}")
     else:
         st.info("Loading PCA mapping data from backend...")
 
