@@ -57,13 +57,23 @@ def fetch_correlation():
         pass
     return None
 
+def fetch_replicated_analysis():
+    try:
+        response = requests.get(f"{API_URL}/replicated-analysis")
+        if response.status_code == 200:
+            return response.json()
+    except Exception:
+        pass
+    return None
+
 st.title("Descriptive Sensory Analysis Dashboard")
 
 # Create tabs
-tab1, tab2, tab3 = st.tabs([
+tab1, tab2, tab3, tab4 = st.tabs([
     "📊 Geometric Means (Dravnieks Score)", 
     "📈 PCA Analysis (Arithmetic Means)",
-    "🔗 Attribute Correlation"
+    "🔗 Attribute Correlation",
+    "🔍 Replicated analysis"
 ])
 
 with tab1:
@@ -286,3 +296,103 @@ with tab3:
                 st.dataframe(df_display_single, use_container_width=True, height=550, hide_index=True)
     else:
         st.info("Loading correlation data from backend...")
+
+with tab4:
+    st.write("This tab provides analysis of discriminating power, repeatability, and usage rates of sensory attributes, as well as panelist performance.")
+    
+    replicated_data = fetch_replicated_analysis()
+    if replicated_data:
+        # 1. Summary Table
+        st.subheader("Descriptor Summary Analysis")
+        if "summary_table" in replicated_data and replicated_data["summary_table"]:
+            df_sum = pd.DataFrame(replicated_data["summary_table"])
+            
+            col_sum, col_bubble = st.columns([1, 1])
+            
+            with col_sum:
+                st.write("### Decision Table")
+                st.dataframe(df_sum, use_container_width=True, height=600)
+                
+            with col_bubble:
+                st.write("### Discriminating Power vs Repeatability")
+                # Bubble plot
+                fig_bubble = px.scatter(
+                    df_sum,
+                    x="Repeatability_r",
+                    y="F_product",
+                    size="UsageRate",
+                    color="Decision",
+                    text="Descriptor",
+                    labels={
+                        "Repeatability_r": "Repeatability r (Rep1 vs Rep2)",
+                        "F_product": "F-ratio (Product effect)",
+                        "UsageRate": "Usage Rate"
+                    },
+                    color_discrete_map={
+                        "GIU": "#2E7D32",
+                        "LOAI": "#C62828",
+                        "XEM LAI": "#F57F17",
+                        "XEM LAI (usage thap)": "#6A1B9A",
+                        "XEM LAI (F thap)": "#E65100"
+                    }
+                )
+                fig_bubble.update_traces(textposition='top center')
+                
+                # Add threshold lines (approximate median for F-product as in R script)
+                f_median = df_sum["F_product"].median()
+                fig_bubble.add_hline(y=f_median, line_width=1.5, line_dash="dash", line_color="gray")
+                fig_bubble.add_vline(x=0.6, line_width=1.5, line_dash="dash", line_color="gray")
+                
+                fig_bubble.update_layout(height=600, margin=dict(l=20, r=20, t=40, b=20))
+                st.plotly_chart(fig_bubble, use_container_width=True)
+
+            st.markdown("---")
+            
+            # 2. Descriptor Correlation Heatmap
+            st.subheader("Descriptor Correlation Heatmap")
+            if "descriptor_correlation_matrix" in replicated_data:
+                matrix_data = replicated_data["descriptor_correlation_matrix"]
+                attrs_corr = matrix_data["attributes"]
+                matrix_vals = matrix_data["matrix"]
+                
+                if attrs_corr and matrix_vals:
+                    df_corr_heatmap = pd.DataFrame(matrix_vals, index=attrs_corr, columns=attrs_corr)
+                    fig_heat_rep = px.imshow(
+                        df_corr_heatmap,
+                        color_continuous_scale="RdBu_r",
+                        zmin=-1.0,
+                        zmax=1.0,
+                        labels=dict(color="Correlation (r)"),
+                        title="Attribute Correlation Matrix"
+                    )
+                    fig_heat_rep.update_layout(height=600, margin=dict(l=40, r=40, t=40, b=40))
+                    st.plotly_chart(fig_heat_rep, use_container_width=True)
+                else:
+                    st.info("No correlation data available for descriptors.")
+            
+            st.markdown("---")
+            
+            # 3. Panelist Performance
+            st.subheader("Panelist Performance")
+            if "panelist_performance" in replicated_data and replicated_data["panelist_performance"]:
+                df_panel = pd.DataFrame(replicated_data["panelist_performance"])
+                st.write("### Median Agreement with Panel (r)")
+                st.dataframe(df_panel.sort_values("median_agreement", ascending=False), use_container_width=True, hide_index=True)
+                
+                # Simple bar chart for agreement
+                fig_panel = px.bar(
+                    df_panel,
+                    x="panelist",
+                    y="median_agreement",
+                    labels={"panelist": "Panelist", "median_agreement": "Median Agreement (r)"},
+                    title="Panelist Agreement Score"
+                )
+                fig_panel.update_layout(height=400)
+                st.plotly_chart(fig_panel, use_container_width=True)
+            else:
+                st.info("No panelist performance data available.")
+                
+        else:
+            st.info("No replicated analysis data available.")
+    else:
+        st.info("Loading replicated analysis data from backend...")

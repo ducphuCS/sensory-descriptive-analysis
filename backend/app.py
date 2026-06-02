@@ -4,6 +4,7 @@ from fastapi import FastAPI, HTTPException
 from sklearn.decomposition import PCA
 from sklearn.preprocessing import StandardScaler
 from dotenv import load_dotenv
+from backend.replicated_analysis import get_replicated_analysis_data
 
 # Load environment variables
 load_dotenv()
@@ -127,3 +128,10 @@ def get_correlation():
         "attributes": attrs,
         "matrix": matrix
     }
+
+@app.get("/api/replicated-analysis")
+def get_replicated_analysis():
+    data = get_replicated_analysis_data()
+    if "error" in data:
+        raise HTTPException(status_code=500, detail=data["error"])
+    return data
